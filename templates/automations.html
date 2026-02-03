@@ -53,13 +53,20 @@ document.getElementById('run-pipeline-form').addEventListener('submit', function
   e.preventDefault();
   var el = document.getElementById('pipeline-result');
   el.textContent = 'Running…';
+  el.style.color = 'var(--text-tertiary)';
   fetch('/trigger', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'full_pipeline' }) })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      el.textContent = (d.pipeline_exit === 0 ? 'Completed successfully.' : 'Pipeline finished with errors.');
-      el.style.color = d.pipeline_exit === 0 ? 'var(--success)' : 'var(--danger)';
+      var ok = d.pipeline_exit === 0;
+      el.textContent = ok ? 'Completed successfully.' : 'Pipeline finished with errors.';
+      el.style.color = ok ? 'var(--success)' : 'var(--danger)';
+      if (typeof Aevel !== 'undefined') Aevel.toast(ok ? 'Pipeline completed' : 'Pipeline had errors', ok ? 'success' : 'error');
     })
-    .catch(function() { el.textContent = 'Request failed.'; el.style.color = 'var(--danger)'; });
+    .catch(function() {
+      el.textContent = 'Request failed.';
+      el.style.color = 'var(--danger)';
+      if (typeof Aevel !== 'undefined') Aevel.toast('Pipeline request failed', 'error');
+    });
 });
 </script>
 {% endblock %}

@@ -16,6 +16,7 @@
   }
 
   function renderCalendar() {
+    if (!gridEl || !titleEl) return;
     var y = current.getFullYear();
     var m = current.getMonth();
     titleEl.textContent = monthNames[m] + ' ' + y;
@@ -54,42 +55,52 @@
   }
 
   function renderEventsList(events, y, m) {
+    if (!eventsListEl) return;
     var monthStr = String(m + 1).padStart(2, '0');
     var inMonth = events.filter(function(e) {
       return e.date && e.date.startsWith(y + '-' + monthStr);
     }).sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
-    eventsListEl.innerHTML = inMonth.map(function(ev) {
-      return '<li><span>' + (ev.date || '') + ' — ' + (ev.title || '') + '</span><button type="button" class="btn btn-small btn-danger" data-id="' + (ev.id || '') + '">Delete</button></li>';
-    }).join('') || '<li class="muted">No events this month</li>';
+    eventsListEl.innerHTML = inMonth.length ? inMonth.map(function(ev) {
+      return '<li><span>' + (ev.date || '') + ' — ' + (ev.title || '').replace(/</g, '&lt;') + '</span><button type="button" class="btn btn-small btn-danger" data-id="' + (ev.id || '') + '" aria-label="Delete event">Delete</button></li>';
+    }).join('') : '<li class="empty-state"><p class="empty-state__title">No events this month</p><p>Add one using the form above.</p></li>';
     eventsListEl.querySelectorAll('.btn-danger').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var id = btn.getAttribute('data-id');
         if (!id) return;
-        api('DELETE', '/api/events/' + id).then(function() { renderCalendar(); });
+        var label = (btn.closest('li') && btn.closest('li').querySelector('span') && btn.closest('li').querySelector('span').textContent) || 'this event';
+        if (typeof Aevel !== 'undefined' && Aevel.confirm) {
+          Aevel.confirm({ title: 'Delete event', body: 'Delete “‘ + label.substring(0, 50) + (label.length > 50 ? '…”' : '”') + '?', confirmLabel: 'Delete', cancelLabel: 'Cancel', danger: true }, function() {
+            api('DELETE', '/api/events/' + id).then(function() { renderCalendar(); if (Aevel.toast) Aevel.toast('Event deleted', 'success'); });
+          });
+        } else {
+          api('DELETE', '/api/events/' + id).then(function() { renderCalendar(); });
+        }
       });
     });
   }
 
-  document.getElementById('cal-prev').addEventListener('click', function() {
-    current.setMonth(current.getMonth() - 1);
-    renderCalendar();
-  });
-  document.getElementById('cal-next').addEventListener('click', function() {
-    current.setMonth(current.getMonth() + 1);
-    renderCalendar();
-  });
+  var prevBtn = document.getElementById('cal-prev');
+  var nextBtn = document.getElementById('cal-next');
+  if (prevBtn) prevBtn.addEventListener('click', function() { current.setMonth(current.getMonth() - 1); renderCalendar(); });
+  if (nextBtn) nextBtn.addEventListener('click', function() { current.setMonth(current.getMonth() + 1); renderCalendar(); });
 
-  document.getElementById('cal-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    var date = document.getElementById('cal-date').value;
-    var title = document.getElementById('cal-title-input').value;
-    if (!date || !title) return;
-    api('POST', '/api/events', { date: date, title: title }).then(function() {
-      document.getElementById('cal-title-input').value = '';
-      document.getElementById('cal-date').value = '';
-      renderCalendar();
+  var calForm = document.getElementById('cal-form');
+  if (calForm) {
+    calForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var dateEl = document.getElementById('cal-date');
+      var titleEl = document.getElementById('cal-title-input');
+      var date = dateEl && dateEl.value;
+      var title = titleEl && titleEl.value && titleEl.value.trim();
+      if (!date || !title) return;
+      api('POST', '/api/events', { date: date, title: title }).then(function() {
+        if (titleEl) titleEl.value = '';
+        if (dateEl) dateEl.value = '';
+        renderCalendar();
+        if (typeof Aevel !== 'undefined' && Aevel.toast) Aevel.toast('Event added', 'success');
+      });
     });
-  });
+  }
 
   renderCalendar();
 })();

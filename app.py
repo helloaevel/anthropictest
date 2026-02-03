@@ -77,6 +77,14 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_preferences (
+            user_id INTEGER PRIMARY KEY,
+            prefs_json TEXT DEFAULT '{}',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -284,6 +292,57 @@ def integrations_page():
 @login_required
 def settings_page():
     return render_template("settings.html")
+
+
+# — API: user preferences (customization)
+DEFAULT_PREFS = {
+    "dashboard_kpis": True,
+    "dashboard_chart": True,
+    "dashboard_recent": True,
+    "dashboard_widgets": True,
+    "compact": False,
+}
+
+
+def get_prefs(user_id):
+    conn = get_db()
+    row = conn.execute("SELECT prefs_json FROM user_preferences WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    if not row:
+        return DEFAULT_PREFS.copy()
+    try:
+        data = json.loads(row["prefs_json"] or "{}")
+        return {**DEFAULT_PREFS, **data}
+    except (TypeError, json.JSONDecodeError):
+        return DEFAULT_PREFS.copy()
+
+
+@app.route("/api/preferences", methods=["GET"])
+@login_required
+def api_preferences_get():
+    return jsonify(get_prefs(get_user_id()))
+
+
+@app.route("/api/preferences", methods=["PATCH"])
+@login_required
+def api_preferences_update():
+    user_id = get_user_id()
+    data = request.get_json(silent=True) or {}
+    prefs = get_prefs(user_id)
+    for k in DEFAULT_PREFS:
+        if k in data:
+            if k == "compact":
+                prefs[k] = bool(data[k])
+            elif k.startswith("dashboard_"):
+                prefs[k] = bool(data[k])
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO user_preferences (user_id, prefs_json, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET prefs_json = excluded.prefs_json, updated_at = CURRENT_TIMESTAMP",
+        (user_id, json.dumps(prefs)),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify(prefs)
 
 
 # — API: dashboard stats

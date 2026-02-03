@@ -61,6 +61,14 @@
       {% block content %}{% endblock %}
     </main>
   </div>
+  <script src="{{ url_for('static', filename='js/aevel-ui.js') }}"></script>
+  <script>
+  (function() {
+    fetch('/api/preferences').then(function(r) { return r.json(); }).then(function(d) {
+      document.body.classList.toggle('compact', !!d.compact);
+    }).catch(function() {});
+  })();
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -7,6 +7,37 @@
 </div>
 
 <section class="section">
+  <h2 class="section-title">Preferences</h2>
+  <div class="card">
+    <p style="margin: 0 0 1rem; font-size: 0.9375rem; color: var(--text-secondary);">Customize what appears on your dashboard and layout density.</p>
+    <div class="prefs-grid">
+      <label class="pref-row">
+        <input type="checkbox" id="pref-dashboard_kpis" class="pref-checkbox">
+        <span>Show KPI cards on dashboard</span>
+      </label>
+      <label class="pref-row">
+        <input type="checkbox" id="pref-dashboard_chart" class="pref-checkbox">
+        <span>Show activity chart on dashboard</span>
+      </label>
+      <label class="pref-row">
+        <input type="checkbox" id="pref-dashboard_recent" class="pref-checkbox">
+        <span>Show recent activity table on dashboard</span>
+      </label>
+      <label class="pref-row">
+        <input type="checkbox" id="pref-dashboard_widgets" class="pref-checkbox">
+        <span>Show calendar & tasks widget on dashboard</span>
+      </label>
+      <label class="pref-row">
+        <input type="checkbox" id="pref-compact" class="pref-checkbox">
+        <span>Compact layout (tighter spacing)</span>
+      </label>
+    </div>
+    <button type="button" class="btn btn-primary" id="prefs-save" style="margin-top: 1rem;">Save preferences</button>
+    <span id="prefs-feedback" class="form-error" style="margin-top: 0.5rem; display: block;"></span>
+  </div>
+</section>
+
+<section class="section">
   <h2 class="section-title">Account</h2>
   <div class="card">
     <div class="card-title">Email</div>
@@ -30,4 +61,50 @@
     <p style="margin: 0; font-size: 0.9375rem; color: var(--text-secondary);">Data analytics dashboard. Pipeline, reports, and automations run on your data. Enterprise-grade, dark mode only.</p>
   </div>
 </section>
+{% endblock %}
+{% block scripts %}
+<script>
+(function() {
+  var prefs = {};
+  function load() {
+    fetch('/api/preferences').then(function(r) { return r.json(); }).then(function(d) {
+      prefs = d;
+      document.getElementById('pref-dashboard_kpis').checked = !!d.dashboard_kpis;
+      document.getElementById('pref-dashboard_chart').checked = !!d.dashboard_chart;
+      document.getElementById('pref-dashboard_recent').checked = !!d.dashboard_recent;
+      document.getElementById('pref-dashboard_widgets').checked = !!d.dashboard_widgets;
+      document.getElementById('pref-compact').checked = !!d.compact;
+      applyCompact(d.compact);
+    });
+  }
+  function applyCompact(on) {
+    document.body.classList.toggle('compact', !!on);
+  }
+  document.getElementById('pref-compact').addEventListener('change', function() { applyCompact(this.checked); });
+  document.getElementById('prefs-save').addEventListener('click', function() {
+    var payload = {
+      dashboard_kpis: document.getElementById('pref-dashboard_kpis').checked,
+      dashboard_chart: document.getElementById('pref-dashboard_chart').checked,
+      dashboard_recent: document.getElementById('pref-dashboard_recent').checked,
+      dashboard_widgets: document.getElementById('pref-dashboard_widgets').checked,
+      compact: document.getElementById('pref-compact').checked
+    };
+    fetch('/api/preferences', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        prefs = d;
+        var fb = document.getElementById('prefs-feedback');
+        fb.textContent = 'Preferences saved.';
+        fb.style.color = 'var(--success)';
+        if (typeof Aevel !== 'undefined') Aevel.toast('Preferences saved', 'success');
+        setTimeout(function() { fb.textContent = ''; }, 3000);
+      })
+      .catch(function() {
+        document.getElementById('prefs-feedback').textContent = 'Failed to save.';
+        document.getElementById('prefs-feedback').style.color = 'var(--danger)';
+      });
+  });
+  load();
+})();
+</script>
 {% endblock %}

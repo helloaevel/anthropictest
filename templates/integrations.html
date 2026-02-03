@@ -25,9 +25,12 @@
     <form id="ai-form">
       <div class="form-group">
         <label>Ask for route or summary</label>
-        <textarea class="textarea" id="ai-input" placeholder="e.g. Run full pipeline / Summarize last report" rows="3"></textarea>
+        <textarea class="textarea" id="ai-input" placeholder="e.g. Run full pipeline / Summarize last report" rows="3" aria-describedby="ai-output"></textarea>
       </div>
-      <button type="submit" class="btn btn-primary">Send</button>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <button type="submit" class="btn btn-primary">Send</button>
+        <button type="button" class="btn btn-ghost" id="ai-clear">Clear</button>
+      </div>
     </form>
     <div id="ai-output" style="margin-top: 1rem; padding: 1rem; background: var(--bg-elevated); border-radius: var(--radius-sm); font-size: 0.875rem; color: var(--text-secondary); min-height: 60px; white-space: pre-wrap;"></div>
   </div>
@@ -48,17 +51,21 @@
   var toggle = document.getElementById('ai-toggle');
   if (toggle) toggle.checked = storage !== 'false';
   toggle.addEventListener('change', function() { localStorage.setItem('blast_ai_enabled', toggle.checked ? 'true' : 'false'); });
+  var out = document.getElementById('ai-output');
+  var aiInput = document.getElementById('ai-input');
   document.getElementById('ai-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    var text = (document.getElementById('ai-input').value || '').trim();
+    var text = (aiInput.value || '').trim();
     if (!text) return;
-    var out = document.getElementById('ai-output');
-    out.textContent = '…';
+    out.textContent = 'Loading…';
+    out.setAttribute('aria-busy', 'true');
     fetch('/api/ai/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: text }) })
       .then(function(r) { return r.json(); })
-      .then(function(d) { out.textContent = d.message || JSON.stringify(d, null, 2); })
-      .catch(function(err) { out.textContent = 'Error: ' + (err.message || 'Request failed'); });
+      .then(function(d) { out.textContent = d.message || JSON.stringify(d, null, 2); out.removeAttribute('aria-busy'); })
+      .catch(function(err) { out.textContent = 'Error: ' + (err.message || 'Request failed'); out.removeAttribute('aria-busy'); });
   });
+  var clearBtn = document.getElementById('ai-clear');
+  if (clearBtn) clearBtn.addEventListener('click', function() { out.textContent = ''; if (aiInput) aiInput.value = ''; });
 })();
 </script>
 {% endblock %}

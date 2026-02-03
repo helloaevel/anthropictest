@@ -1,0 +1,91 @@
+/**
+ * Aevel — shared UI utilities: toasts, confirm modal, loading states
+ */
+(function() {
+  var toastContainer = null;
+
+  function getToastContainer() {
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.className = 'toast-container';
+      toastContainer.setAttribute('aria-live', 'polite');
+      document.body.appendChild(toastContainer);
+    }
+    return toastContainer;
+  }
+
+  window.Aevel = {
+    toast: function(message, type) {
+      type = type || 'success';
+      var el = document.createElement('div');
+      el.className = 'toast toast--' + type;
+      el.textContent = message;
+      getToastContainer().appendChild(el);
+      requestAnimationFrame(function() { el.classList.add('toast--visible'); });
+      setTimeout(function() {
+        el.classList.remove('toast--visible');
+        setTimeout(function() { el.remove(); }, 300);
+      }, 3200);
+    },
+
+    confirm: function(options, onConfirm, onCancel) {
+      var title = options.title || 'Confirm';
+      var body = options.body || 'Are you sure?';
+      var confirmLabel = options.confirmLabel || 'Confirm';
+      var cancelLabel = options.cancelLabel || 'Cancel';
+      var danger = options.danger === true;
+
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.setAttribute('role', 'dialog');
+      overlay.setAttribute('aria-modal', 'true');
+      overlay.setAttribute('aria-labelledby', 'confirm-title');
+
+      var modal = document.createElement('div');
+      modal.className = 'confirm-modal';
+      modal.innerHTML =
+        '<h3 id="confirm-title" class="confirm-modal__title">' + (title.replace(/</g, '&lt;')) + '</h3>' +
+        '<p class="confirm-modal__body">' + (body.replace(/</g, '&lt;')) + '</p>' +
+        '<div class="confirm-modal__actions">' +
+          '<button type="button" class="btn btn-ghost confirm-cancel">' + (cancelLabel.replace(/</g, '&lt;')) + '</button>' +
+          '<button type="button" class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + ' confirm-ok">' + (confirmLabel.replace(/</g, '&lt;')) + '</button>' +
+        '</div>';
+      overlay.appendChild(modal);
+
+      function close(result) {
+        overlay.classList.remove('modal-overlay--visible');
+        setTimeout(function() {
+          overlay.remove();
+          document.body.style.overflow = '';
+        }, 200);
+        if (result && typeof onConfirm === 'function') onConfirm();
+        if (!result && typeof onCancel === 'function') onCancel();
+      }
+
+      modal.querySelector('.confirm-ok').addEventListener('click', function() { close(true); });
+      modal.querySelector('.confirm-cancel').addEventListener('click', function() { close(false); });
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) close(false); });
+      overlay.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') close(false);
+        if (e.key === 'Enter') close(true);
+      });
+
+      document.body.style.overflow = 'hidden';
+      document.body.appendChild(overlay);
+      requestAnimationFrame(function() { overlay.classList.add('modal-overlay--visible'); });
+      modal.querySelector('.confirm-ok').focus();
+    },
+
+    loading: function(containerId, show) {
+      var el = document.getElementById(containerId);
+      if (!el) return;
+      if (show) {
+        el.classList.add('loading-active');
+        el.setAttribute('aria-busy', 'true');
+      } else {
+        el.classList.remove('loading-active');
+        el.removeAttribute('aria-busy');
+      }
+    }
+  };
+})();

@@ -50,7 +50,7 @@
       var tbody = document.getElementById('notes-tbody');
       tbody.innerHTML = notes.length ? notes.map(function(n) {
         return '<tr><td class="cell-primary">' + (n.title || '').replace(/</g, '&lt;') + '</td><td>—</td><td><a href="/notes" class="btn btn-ghost btn-small">Open</a></td></tr>';
-      }).join('') : '<tr><td colspan="3" class="cell-primary">No reports yet</td></tr>';
+      }).join('') : '<tr><td colspan="3"><div class="empty-state"><p class="empty-state__title">No reports yet</p><p>Create one above or go to <a href="/notes">Notes</a>.</p></div></td></tr>';
     });
   }
   document.getElementById('note-form').addEventListener('submit', function(e) {
@@ -59,7 +59,14 @@
     var body = document.getElementById('note-body').value || '';
     if (!title) return;
     fetch('/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, body: body }) })
-      .then(function() { document.getElementById('note-title').value = ''; document.getElementById('note-body').value = ''; load(); });
+      .then(function(r) {
+        if (r.ok) {
+          document.getElementById('note-title').value = '';
+          document.getElementById('note-body').value = '';
+          load();
+          if (typeof Aevel !== 'undefined' && Aevel.toast) Aevel.toast('Report saved', 'success');
+        }
+      });
   });
   load();
 })();
