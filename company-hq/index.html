@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company HQ</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css' rel='stylesheet' />
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .nav-item {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-item:hover {
+            background: rgba(96, 165, 250, 0.1);
+            transform: translateX(4px);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(90deg, rgba(96, 165, 250, 0.2) 0%, transparent 100%);
+            border-left: 3px solid #60a5fa;
+        }
+
+        .task-card {
+            transition: all 0.2s ease;
+        }
+
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(96, 165, 250, 0.2);
+        }
+
+        .ai-toggle {
+            position: relative;
+            width: 48px;
+            height: 24px;
+            background: #334155;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .ai-toggle.active {
+            background: linear-gradient(90deg, #60a5fa, #a78bfa);
+        }
+
+        .ai-toggle-knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .ai-toggle.active .ai-toggle-knob {
+            transform: translateX(24px);
+        }
+
+        .fc {
+            background: transparent;
+        }
+
+        .fc .fc-button-primary {
+            background: rgba(96, 165, 250, 0.2);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            color: #60a5fa;
+        }
+
+        .fc .fc-button-primary:hover {
+            background: rgba(96, 165, 250, 0.3);
+        }
+
+        .fc-theme-standard td, .fc-theme-standard th {
+            border-color: rgba(148, 163, 184, 0.1);
+        }
+
+        .fc-day-today {
+            background: rgba(96, 165, 250, 0.1) !important;
+        }
+
+        .quill-editor {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 12px;
+            color: #e2e8f0;
+        }
+
+        .ql-toolbar {
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 12px 12px 0 0;
+            border: none;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .ql-container {
+            border: none;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .ql-editor {
+            min-height: 300px;
+            color: #e2e8f0;
+        }
+
+        .ql-snow .ql-stroke {
+            stroke: #94a3b8;
+        }
+
+        .ql-snow .ql-fill {
+            fill: #94a3b8;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .priority-high {
+            border-left: 3px solid #ef4444;
+        }
+
+        .priority-medium {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .priority-low {
+            border-left: 3px solid #10b981;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-todo {
+            background: rgba(148, 163, 184, 0.2);
+            color: #cbd5e1;
+        }
+
+        .status-in_progress {
+            background: rgba(96, 165, 250, 0.2);
+            color: #60a5fa;
+        }
+
+        .status-done {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        input, textarea, select {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 14px;
+            transition: all 0.2s;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+        }
+
+        button {
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // API Base URL - change this to your Render URL after deployment
+        const API_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:5000' 
+            : window.location.origin;
+
+        // Icons Component
+        const Icons = {
+            Calendar: () => (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+            ),
+            Tasks: () => (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+            ),
+            Notes: () => (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+            ),
+            AI: () => (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+            ),
+            Plus: () => (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+            ),
+            X: () => (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            ),
+            Send: () => (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+            ),
+            Logout: () => (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+            )
+        };
+
+        // Auth Component
+        function AuthPage({ onLogin }) {
+            const [isLogin, setIsLogin] = useState(true);
+            const [formData, setFormData] = useState({
+                username: '',
+                email: '',
+                password: ''
+            });
+            const [error, setError] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+
+                const endpoint = isLogin ? '/api/login' : '/api/register';
+                const data = isLogin 
+                    ? { username: formData.username, password: formData.password }
+                    : formData;
+
+                try {
+                    const response = await fetch(`${API_URL}${endpoint}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(data)
+                    });
+
+                    if (response.ok) {
+                        const user = await response.json();
+                        onLogin(user);
+                    } else {
+                        const errorData = await response.json();
+                        setError(errorData.error || 'Authentication failed');
+                    }
+                } catch (err) {
+                    setError('Network error. Please try again.');
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="glass-card p-8 w-full max-w-md animate-fade-in">
+                        <h1 className="text-4xl font-bold gradient-text mb-2 text-center">Company HQ</h1>
+                        <p className="text-slate-400 text-center mb-8">Your team workspace</p>
+
+                        <div className="flex gap-2 mb-6">
+                            <button
+                                onClick={() => setIsLogin(true)}
+                                className={`flex-1 py-2 rounded-lg font-medium transition ${
+                                    isLogin ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-300'
+                                }`}
+                            >
+                                Login
+                            </button>
+                            <button
+                                onClick={() => setIsLogin(false)}
+                                className={`flex-1 py-2 rounded-lg font-medium transition ${
+                                    !isLogin ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-300'
+                                }`}
+                            >
+                                Register
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <input
+                                type="text"
+                                placeholder="Username"
+                                value={formData.username}
+                                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                                className="w-full"
+                                required
+                            />
+                            {!isLogin && (
+                                <input
+                                    type="email"
+                                    placeholder="Email"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    className="w-full"
+                                    required
+                                />
+                            )}
+                            <input
+                                type="password"
+                                placeholder="Password"
+                                value={formData.password}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                className="w-full"
+                                required
+                            />
+                            {error && (
+                                <div className="bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-2 rounded-lg text-sm">
+                                    {error}
+                                </div>
+                            )}
+                            <button
+                                type="submit"
+                                className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg"
+                            >
+                                {isLogin ? 'Login' : 'Create Account'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        // Calendar Component
+        function CalendarView() {
+            const calendarRef = useRef(null);
+            const [events, setEvents] = useState([]);
+
+            useEffect(() => {
+                loadEvents();
+            }, []);
+
+            useEffect(() => {
+                if (calendarRef.current && !calendarRef.current.classList.contains('fc')) {
+                    const calendar = new FullCalendar.Calendar(calendarRef.current, {
+                        initialView: 'dayGridMonth',
+                        headerToolbar: {
+                            left: 'prev,next today',
+                            center: 'title',
+                            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                        },
+                        events: events,
+                        editable: true,
+                        selectable: true,
+                        select: handleDateSelect,
+                        eventClick: handleEventClick,
+                        eventDrop: handleEventDrop,
+                        eventResize: handleEventResize
+                    });
+                    calendar.render();
+                }
+            }, [events]);
+
+            const loadEvents = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/events`, { credentials: 'include' });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setEvents(data);
+                    }
+                } catch (err) {
+                    console.error('Error loading events:', err);
+                }
+            };
+
+            const handleDateSelect = async (selectInfo) => {
+                const title = prompt('Event title:');
+                if (title) {
+                    try {
+                        const response = await fetch(`${API_URL}/api/events`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                title,
+                                start: selectInfo.startStr,
+                                end: selectInfo.endStr,
+                                allDay: selectInfo.allDay
+                            })
+                        });
+                        if (response.ok) {
+                            loadEvents();
+                        }
+                    } catch (err) {
+                        console.error('Error creating event:', err);
+                    }
+                }
+            };
+
+            const handleEventClick = async (clickInfo) => {
+                if (confirm('Delete this event?')) {
+                    try {
+                        const response = await fetch(`${API_URL}/api/events/${clickInfo.event.id}`, {
+                            method: 'DELETE',
+                            credentials: 'include'
+                        });
+                        if (response.ok) {
+                            clickInfo.event.remove();
+                        }
+                    } catch (err) {
+                        console.error('Error deleting event:', err);
+                    }
+                }
+            };
+
+            const handleEventDrop = async (dropInfo) => {
+                try {
+                    await fetch(`${API_URL}/api/events/${dropInfo.event.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            start: dropInfo.event.startStr,
+                            end: dropInfo.event.endStr
+                        })
+                    });
+                } catch (err) {
+                    console.error('Error updating event:', err);
+                    dropInfo.revert();
+                }
+            };
+
+            const handleEventResize = async (resizeInfo) => {
+                try {
+                    await fetch(`${API_URL}/api/events/${resizeInfo.event.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            start: resizeInfo.event.startStr,
+                            end: resizeInfo.event.endStr
+                        })
+                    });
+                } catch (err) {
+                    console.error('Error updating event:', err);
+                    resizeInfo.revert();
+                }
+            };
+
+            return (
+                <div className="glass-card p-6 animate-fade-in">
+                    <h2 className="text-2xl font-bold mb-6">Calendar</h2>
+                    <div ref={calendarRef}></div>
+                </div>
+            );
+        }
+
+        // Tasks Component
+        function TasksView({ currentUser }) {
+            const [tasks, setTasks] = useState([]);
+            const [showModal, setShowModal] = useState(false);
+            const [users, setUsers] = useState([]);
+            const [newTask, setNewTask] = useState({
+                title: '',
+                description: '',
+                priority: 'medium',
+                status: 'todo',
+                dueDate: '',
+                assignedTo: null
+            });
+
+            useEffect(() => {
+                loadTasks();
+                loadUsers();
+            }, []);
+
+            const loadTasks = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/tasks`, { credentials: 'include' });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setTasks(data);
+                    }
+                } catch (err) {
+                    console.error('Error loading tasks:', err);
+                }
+            };
+
+            const loadUsers = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/users`, { credentials: 'include' });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setUsers(data);
+                    }
+                } catch (err) {
+                    console.error('Error loading users:', err);
+                }
+            };
+
+            const createTask = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/tasks`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(newTask)
+                    });
+                    if (response.ok) {
+                        loadTasks();
+                        setShowModal(false);
+                        setNewTask({ title: '', description: '', priority: 'medium', status: 'todo', dueDate: '', assignedTo: null });
+                    }
+                } catch (err) {
+                    console.error('Error creating task:', err);
+                }
+            };
+
+            const updateTaskStatus = async (taskId, newStatus) => {
+                try {
+                    const response = await fetch(`${API_URL}/api/tasks/${taskId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ status: newStatus })
+                    });
+                    if (response.ok) {
+                        loadTasks();
+                    }
+                } catch (err) {
+                    console.error('Error updating task:', err);
+                }
+            };
+
+            const deleteTask = async (taskId) => {
+                if (confirm('Delete this task?')) {
+                    try {
+                        const response = await fetch(`${API_URL}/api/tasks/${taskId}`, {
+                            method: 'DELETE',
+                            credentials: 'include'
+                        });
+                        if (response.ok) {
+                            loadTasks();
+                        }
+                    } catch (err) {
+                        console.error('Error deleting task:', err);
+                    }
+                }
+            };
+
+            const tasksByStatus = {
+                todo: tasks.filter(t => t.status === 'todo'),
+                in_progress: tasks.filter(t => t.status === 'in_progress'),
+                done: tasks.filter(t => t.status === 'done')
+            };
+
+            const TaskCard = ({ task }) => (
+                <div className={`glass-card p-4 mb-3 task-card priority-${task.priority}`}>
+                    <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-semibold text-lg">{task.title}</h4>
+                        <button onClick={() => deleteTask(task.id)} className="text-red-400 hover:text-red-300">
+                            <Icons.X />
+                        </button>
+                    </div>
+                    {task.description && <p className="text-slate-400 text-sm mb-3">{task.description}</p>}
+                    <div className="flex flex-wrap gap-2 items-center">
+                        <span className={`status-badge status-${task.status}`}>
+                            {task.status.replace('_', ' ')}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                            {task.priority.toUpperCase()}
+                        </span>
+                        {task.assigneeName && (
+                            <span className="text-xs text-slate-400">
+                                → {task.assigneeName}
+                            </span>
+                        )}
+                        {task.dueDate && (
+                            <span className="text-xs text-slate-400">
+                                Due: {new Date(task.dueDate).toLocaleDateString()}
+                            </span>
+                        )}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                        {task.status !== 'todo' && (
+                            <button 
+                                onClick={() => updateTaskStatus(task.id, 'todo')}
+                                className="text-xs px-3 py-1 bg-slate-600 rounded hover:bg-slate-500"
+                            >
+                                To Do
+                            </button>
+                        )}
+                        {task.status !== 'in_progress' && (
+                            <button 
+                                onClick={() => updateTaskStatus(task.id, 'in_progress')}
+                                className="text-xs px-3 py-1 bg-blue-600 rounded hover:bg-blue-500"
+                            >
+                                In Progress
+                            </button>
+                        )}
+                        {task.status !== 'done' && (
+                            <button 
+                                onClick={() => updateTaskStatus(task.id, 'done')}
+                                className="text-xs px-3 py-1 bg-green-600 rounded hover:bg-green-500"
+                            >
+                                Done
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="animate-fade-in">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold">Tasks</h2>
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg font-medium"
+                        >
+                            <Icons.Plus /> New Task
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold mb-3 text-slate-400">To Do ({tasksByStatus.todo.length})</h3>
+                            {tasksByStatus.todo.map(task => <TaskCard key={task.id} task={task} />)}
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold mb-3 text-blue-400">In Progress ({tasksByStatus.in_progress.length})</h3>
+                            {tasksByStatus.in_progress.map(task => <TaskCard key={task.id} task={task} />)}
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold mb-3 text-green-400">Done ({tasksByStatus.done.length})</h3>
+                            {tasksByStatus.done.map(task => <TaskCard key={task.id} task={task} />)}
+                        </div>
+                    </div>
+
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                            <div className="glass-card p-6 w-full max-w-lg">
+                                <h3 className="text-xl font-bold mb-4">Create New Task</h3>
+                                <div className="space-y-4">
+                                    <input
+                                        type="text"
+                                        placeholder="Task title"
+                                        value={newTask.title}
+                                        onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                                        className="w-full"
+                                    />
+                                    <textarea
+                                        placeholder="Description (optional)"
+                                        value={newTask.description}
+                                        onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                                        className="w-full"
+                                        rows="3"
+                                    />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <select
+                                            value={newTask.priority}
+                                            onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                                            className="w-full"
+                                        >
+                                            <option value="low">Low Priority</option>
+                                            <option value="medium">Medium Priority</option>
+                                            <option value="high">High Priority</option>
+                                        </select>
+                                        <select
+                                            value={newTask.assignedTo || ''}
+                                            onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value ? parseInt(e.target.value) : null })}
+                                            className="w-full"
+                                        >
+                                            <option value="">Unassigned</option>
+                                            {users.map(user => (
+                                                <option key={user.id} value={user.id}>{user.username}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <input
+                                        type="date"
+                                        value={newTask.dueDate}
+                                        onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                                        className="w-full"
+                                    />
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={createTask}
+                                            className="flex-1 bg-blue-500 hover:bg-blue-600 py-2 rounded-lg font-medium"
+                                        >
+                                            Create Task
+                                        </button>
+                                        <button
+                                            onClick={() => setShowModal(false)}
+                                            className="flex-1 bg-slate-600 hover:bg-slate-500 py-2 rounded-lg font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Notes Component
+        function NotesView() {
+            const [notes, setNotes] = useState([]);
+            const [selectedNote, setSelectedNote] = useState(null);
+            const [showModal, setShowModal] = useState(false);
+            const [newNoteTitle, setNewNoteTitle] = useState('');
+            const editorRef = useRef(null);
+            const quillRef = useRef(null);
+
+            useEffect(() => {
+                loadNotes();
+            }, []);
+
+            useEffect(() => {
+                if (editorRef.current && !quillRef.current) {
+                    quillRef.current = new Quill(editorRef.current, {
+                        theme: 'snow',
+                        modules: {
+                            toolbar: [
+                                [{ 'header': [1, 2, 3, false] }],
+                                ['bold', 'italic', 'underline'],
+                                ['link', 'code-block'],
+                                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                ['clean']
+                            ]
+                        }
+                    });
+
+                    if (selectedNote) {
+                        quillRef.current.root.innerHTML = selectedNote.content;
+                    }
+                }
+            }, [editorRef.current, selectedNote]);
+
+            const loadNotes = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/notes`, { credentials: 'include' });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setNotes(data);
+                    }
+                } catch (err) {
+                    console.error('Error loading notes:', err);
+                }
+            };
+
+            const createNote = async () => {
+                if (!newNoteTitle) return;
+                try {
+                    const response = await fetch(`${API_URL}/api/notes`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            title: newNoteTitle,
+                            content: '',
+                            isShared: false
+                        })
+                    });
+                    if (response.ok) {
+                        const note = await response.json();
+                        setNotes([...notes, note]);
+                        setSelectedNote(note);
+                        setShowModal(false);
+                        setNewNoteTitle('');
+                    }
+                } catch (err) {
+                    console.error('Error creating note:', err);
+                }
+            };
+
+            const saveNote = async () => {
+                if (!selectedNote || !quillRef.current) return;
+                try {
+                    const response = await fetch(`${API_URL}/api/notes/${selectedNote.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            content: quillRef.current.root.innerHTML
+                        })
+                    });
+                    if (response.ok) {
+                        alert('Note saved!');
+                    }
+                } catch (err) {
+                    console.error('Error saving note:', err);
+                }
+            };
+
+            const deleteNote = async (noteId) => {
+                if (confirm('Delete this note?')) {
+                    try {
+                        const response = await fetch(`${API_URL}/api/notes/${noteId}`, {
+                            method: 'DELETE',
+                            credentials: 'include'
+                        });
+                        if (response.ok) {
+                            setNotes(notes.filter(n => n.id !== noteId));
+                            if (selectedNote?.id === noteId) {
+                                setSelectedNote(null);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error deleting note:', err);
+                    }
+                }
+            };
+
+            return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
+                    <div className="glass-card p-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-semibold">All Notes</h3>
+                            <button
+                                onClick={() => setShowModal(true)}
+                                className="bg-blue-500 hover:bg-blue-600 p-2 rounded"
+                            >
+                                <Icons.Plus />
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-hide">
+                            {notes.map(note => (
+                                <div
+                                    key={note.id}
+                                    onClick={() => setSelectedNote(note)}
+                                    className={`p-3 rounded-lg cursor-pointer transition ${
+                                        selectedNote?.id === note.id ? 'bg-blue-500/20' : 'bg-slate-700/50 hover:bg-slate-700'
+                                    }`}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                            <h4 className="font-medium">{note.title}</h4>
+                                            <p className="text-xs text-slate-400">
+                                                {note.isShared ? '🌐 Shared' : '🔒 Private'} • {note.userName}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
+                                            className="text-red-400 hover:text-red-300"
+                                        >
+                                            <Icons.X />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="md:col-span-2 glass-card p-4">
+                        {selectedNote ? (
+                            <>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold">{selectedNote.title}</h2>
+                                    <button
+                                        onClick={saveNote}
+                                        className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg font-medium"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                                <div ref={editorRef} className="quill-editor"></div>
+                            </>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-slate-400">
+                                <p>Select a note or create a new one</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                            <div className="glass-card p-6 w-full max-w-md">
+                                <h3 className="text-xl font-bold mb-4">New Note</h3>
+                                <input
+                                    type="text"
+                                    placeholder="Note title"
+                                    value={newNoteTitle}
+                                    onChange={(e) => setNewNoteTitle(e.target.value)}
+                                    className="w-full mb-4"
+                                />
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={createNote}
+                                        className="flex-1 bg-blue-500 hover:bg-blue-600 py-2 rounded-lg font-medium"
+                                    >
+                                        Create
+                                    </button>
+                                    <button
+                                        onClick={() => setShowModal(false)}
+                                        className="flex-1 bg-slate-600 hover:bg-slate-500 py-2 rounded-lg font-medium"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // AI Assistant Component
+        function AIAssistant({ currentUser }) {
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [quota, setQuota] = useState({ used: 0, limit: 50, remaining: 50 });
+            const [loading, setLoading] = useState(false);
+
+            useEffect(() => {
+                loadQuota();
+            }, []);
+
+            const loadQuota = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/ai/quota`, { credentials: 'include' });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setQuota(data);
+                    }
+                } catch (err) {
+                    console.error('Error loading quota:', err);
+                }
+            };
+
+            const sendMessage = async () => {
+                if (!input.trim()) return;
+
+                const userMessage = { role: 'user', content: input };
+                setMessages([...messages, userMessage]);
+                setInput('');
+                setLoading(true);
+
+                try {
+                    const response = await fetch(`${API_URL}/api/ai/chat`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ prompt: input, taskType: 'general' })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+                        setQuota(prev => ({ ...prev, used: prev.used + 1, remaining: data.requestsRemaining }));
+                    } else {
+                        const errorData = await response.json();
+                        setMessages(prev => [...prev, { role: 'error', content: errorData.error }]);
+                    }
+                } catch (err) {
+                    setMessages(prev => [...prev, { role: 'error', content: 'Failed to send message' }]);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            if (!currentUser.ai_enabled) {
+                return (
+                    <div className="glass-card p-8 text-center animate-fade-in">
+                        <div className="text-6xl mb-4">🤖</div>
+                        <h2 className="text-2xl font-bold mb-2">AI Assistant Disabled</h2>
+                        <p className="text-slate-400">Enable AI assistant in your settings to use this feature.</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="glass-card p-6 animate-fade-in">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold">AI Assistant</h2>
+                        <div className="text-sm text-slate-400">
+                            Quota: {quota.remaining}/{quota.limit} remaining today
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800/50 rounded-lg p-4 mb-4 h-[500px] overflow-y-auto scrollbar-hide">
+                        {messages.length === 0 ? (
+                            <div className="h-full flex items-center justify-center text-slate-400">
+                                <div className="text-center">
+                                    <div className="text-6xl mb-4">💡</div>
+                                    <p>Ask me to analyze data, generate reports, or help with marketing content!</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {messages.map((msg, idx) => (
+                                    <div
+                                        key={idx}
+                                        className={`p-4 rounded-lg ${
+                                            msg.role === 'user' 
+                                                ? 'bg-blue-500/20 ml-12' 
+                                                : msg.role === 'error'
+                                                ? 'bg-red-500/20'
+                                                : 'bg-slate-700/50 mr-12'
+                                        }`}
+                                    >
+                                        <div className="font-semibold mb-1 text-sm">
+                                            {msg.role === 'user' ? 'You' : msg.role === 'error' ? 'Error' : 'AI Assistant'}
+                                        </div>
+                                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                                    </div>
+                                ))}
+                                {loading && (
+                                    <div className="bg-slate-700/50 p-4 rounded-lg mr-12">
+                                        <div className="flex gap-2">
+                                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex gap-3">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                            placeholder="Ask me anything..."
+                            className="flex-1"
+                            disabled={loading || quota.remaining === 0}
+                        />
+                        <button
+                            onClick={sendMessage}
+                            disabled={loading || quota.remaining === 0}
+                            className="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            <Icons.Send /> Send
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main Dashboard
+        function Dashboard() {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [currentView, setCurrentView] = useState('calendar');
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                checkAuth();
+            }, []);
+
+            const checkAuth = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/me`, { credentials: 'include' });
+                    if (response.ok) {
+                        const user = await response.json();
+                        setCurrentUser(user);
+                    }
+                } catch (err) {
+                    console.error('Auth check failed:', err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleLogout = async () => {
+                try {
+                    await fetch(`${API_URL}/api/logout`, { 
+                        method: 'POST',
+                        credentials: 'include' 
+                    });
+                    setCurrentUser(null);
+                } catch (err) {
+                    console.error('Logout failed:', err);
+                }
+            };
+
+            const toggleAI = async () => {
+                try {
+                    const response = await fetch(`${API_URL}/api/users/${currentUser.id}/ai-toggle`, {
+                        method: 'PATCH',
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        setCurrentUser({ ...currentUser, ai_enabled: data.ai_enabled });
+                    }
+                } catch (err) {
+                    console.error('Failed to toggle AI:', err);
+                }
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-2xl gradient-text">Loading...</div>
+                    </div>
+                );
+            }
+
+            if (!currentUser) {
+                return <AuthPage onLogin={setCurrentUser} />;
+            }
+
+            return (
+                <div className="min-h-screen flex">
+                    {/* Sidebar */}
+                    <div className="w-64 glass-card m-4 p-6 flex flex-col">
+                        <h1 className="text-2xl font-bold gradient-text mb-8">Company HQ</h1>
+
+                        <nav className="flex-1 space-y-2">
+                            <button
+                                onClick={() => setCurrentView('calendar')}
+                                className={`nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg ${
+                                    currentView === 'calendar' ? 'active' : ''
+                                }`}
+                            >
+                                <Icons.Calendar /> Calendar
+                            </button>
+                            <button
+                                onClick={() => setCurrentView('tasks')}
+                                className={`nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg ${
+                                    currentView === 'tasks' ? 'active' : ''
+                                }`}
+                            >
+                                <Icons.Tasks /> Tasks
+                            </button>
+                            <button
+                                onClick={() => setCurrentView('notes')}
+                                className={`nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg ${
+                                    currentView === 'notes' ? 'active' : ''
+                                }`}
+                            >
+                                <Icons.Notes /> Notes
+                            </button>
+                            <button
+                                onClick={() => setCurrentView('ai')}
+                                className={`nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg ${
+                                    currentView === 'ai' ? 'active' : ''
+                                }`}
+                            >
+                                <Icons.AI /> AI Assistant
+                            </button>
+                        </nav>
+
+                        <div className="border-t border-slate-700 pt-4 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-slate-400">AI Assistant</span>
+                                <div 
+                                    onClick={toggleAI}
+                                    className={`ai-toggle ${currentUser.ai_enabled ? 'active' : ''}`}
+                                >
+                                    <div className="ai-toggle-knob"></div>
+                                </div>
+                            </div>
+
+                            <div className="text-sm">
+                                <div className="text-slate-400 mb-1">Logged in as</div>
+                                <div className="font-medium">{currentUser.username}</div>
+                                <div className="text-xs text-slate-500">{currentUser.role}</div>
+                            </div>
+
+                            <button
+                                onClick={handleLogout}
+                                className="w-full flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-300 transition"
+                            >
+                                <Icons.Logout /> Logout
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex-1 p-4 overflow-y-auto scrollbar-hide">
+                        {currentView === 'calendar' && <CalendarView />}
+                        {currentView === 'tasks' && <TasksView currentUser={currentUser} />}
+                        {currentView === 'notes' && <NotesView />}
+                        {currentView === 'ai' && <AIAssistant currentUser={currentUser} />}
+                    </div>
+                </div>
+            );
+        }
+
+        // Render App
+        ReactDOM.render(<Dashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
