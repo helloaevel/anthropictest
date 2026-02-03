@@ -1,68 +1,102 @@
 """
 B.L.A.S.T. Analytics — Web app entrypoint.
 Render-ready; cron/webhook trigger; health check; dashboard (calendar, tasks, notes, AI).
+Email/password authentication with SQLite database.
 """
 
 import json
 import os
 import sys
 import uuid
+import sqlite3
 from pathlib import Path
+from functools import wraps
 
 # Ensure project root on path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, session
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production-" + str(uuid.uuid4()))
 
 # Ensure .tmp exists
 TMP_DIR = ROOT / ".tmp"
 TMP_DIR.mkdir(parents=True, exist_ok=True)
 
-TASKS_FILE = TMP_DIR / "dashboard_tasks.json"
-NOTES_FILE = TMP_DIR / "dashboard_notes.json"
-EVENTS_FILE = TMP_DIR / "dashboard_events.json"
+DB_FILE = TMP_DIR / "app.db"
 
 
-def _load_json(path, default):
-    if not path.is_file():
-        return default
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return default
+def get_db():
+    """Get database connection."""
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
-def _save_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+def init_db():
+    """Initialize database tables."""
+    conn = get_db()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            done INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS notes (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            title TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 
-def _tasks():
-    return _load_json(TASKS_FILE, {"tasks": []})["tasks"]
+init_db()
 
 
-def _save_tasks(tasks):
-    _save_json(TASKS_FILE, {"tasks": tasks})
+def login_required(f):
+    """Decorator to require login."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
 
 
-def _notes():
-    return _load_json(NOTES_FILE, {"notes": []})["notes"]
-
-
-def _save_notes(notes):
-    _save_json(NOTES_FILE, {"notes": notes})
-
-
-def _events():
-    return _load_json(EVENTS_FILE, {"events": []})["events"]
-
-
-def _save_events(events):
-    _save_json(EVENTS_FILE, {"events": events})
+def get_user_id():
+    """Get current user ID from session."""
+    return session.get("user_id")
 
 
 def run_pipeline():
@@ -126,132 +160,244 @@ def trigger():
     return jsonify({"route": result, "tool_exit": code}), 200 if code == 0 else 500
 
 
+# — Auth routes
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
+        if not email or not password:
+            flash("Email and password required", "error")
+            return render_template("login.html")
+        conn = get_db()
+        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        conn.close()
+        if user and check_password_hash(user["password_hash"], password):
+            session["user_id"] = user["id"]
+            session["user_email"] = user["email"]
+            return redirect(url_for("dashboard"))
+        flash("Invalid email or password", "error")
+    return render_template("login.html")
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
+        confirm = request.form.get("confirm") or ""
+        if not email or not password:
+            flash("Email and password required", "error")
+            return render_template("register.html")
+        if password != confirm:
+            flash("Passwords do not match", "error")
+            return render_template("register.html")
+        if len(password) < 6:
+            flash("Password must be at least 6 characters", "error")
+            return render_template("register.html")
+        conn = get_db()
+        try:
+            conn.execute(
+                "INSERT INTO users (email, password_hash) VALUES (?, ?)",
+                (email, generate_password_hash(password))
+            )
+            conn.commit()
+            user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+            conn.close()
+            session["user_id"] = user["id"]
+            session["user_email"] = user["email"]
+            return redirect(url_for("dashboard"))
+        except sqlite3.IntegrityError:
+            conn.close()
+            flash("Email already registered", "error")
+    return render_template("register.html")
+
+
+@app.route("/logout", methods=["POST", "GET"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/", methods=["GET"])
 def index():
-    return redirect(url_for("dashboard"))
+    if "user_id" in session:
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("login"))
 
 
 @app.route("/dashboard", methods=["GET"])
+@login_required
 def dashboard():
     return render_template("dashboard.html")
 
 
 @app.route("/calendar", methods=["GET"])
+@login_required
 def calendar_page():
     return render_template("calendar.html")
 
 
 @app.route("/tasks", methods=["GET"])
+@login_required
 def tasks_page():
     return render_template("tasks.html")
 
 
 @app.route("/notes", methods=["GET"])
+@login_required
 def notes_page():
     return render_template("notes.html")
 
 
 @app.route("/ai", methods=["GET"])
+@login_required
 def ai_page():
     return render_template("ai.html")
 
 
 # — API: tasks
 @app.route("/api/tasks", methods=["GET"])
+@login_required
 def api_tasks_list():
-    return jsonify({"tasks": _tasks()})
+    user_id = get_user_id()
+    conn = get_db()
+    rows = conn.execute("SELECT id, text, done FROM tasks WHERE user_id = ? ORDER BY created_at DESC", (user_id,)).fetchall()
+    conn.close()
+    tasks = [{"id": r["id"], "text": r["text"], "done": bool(r["done"])} for r in rows]
+    return jsonify({"tasks": tasks})
 
 
 @app.route("/api/tasks", methods=["POST"])
+@login_required
 def api_tasks_create():
+    user_id = get_user_id()
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
     if not text:
         return jsonify({"error": "text required"}), 400
-    tasks = _tasks()
-    task = {"id": str(uuid.uuid4()), "text": text, "done": False}
-    tasks.append(task)
-    _save_tasks(tasks)
-    return jsonify(task), 201
+    task_id = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute("INSERT INTO tasks (id, user_id, text) VALUES (?, ?, ?)", (task_id, user_id, text))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": task_id, "text": text, "done": False}), 201
 
 
 @app.route("/api/tasks/<tid>", methods=["PATCH"])
+@login_required
 def api_tasks_update(tid):
+    user_id = get_user_id()
     data = request.get_json(silent=True) or {}
-    tasks = _tasks()
-    for t in tasks:
-        if str(t.get("id")) == str(tid):
-            if "done" in data:
-                t["done"] = bool(data["done"])
-            if "text" in data:
-                t["text"] = str(data["text"]).strip() or t["text"]
-            _save_tasks(tasks)
-            return jsonify(t)
-    return jsonify({"error": "not found"}), 404
+    conn = get_db()
+    if "done" in data:
+        conn.execute("UPDATE tasks SET done = ? WHERE id = ? AND user_id = ?", (1 if data["done"] else 0, tid, user_id))
+    if "text" in data:
+        text = str(data["text"]).strip()
+        if text:
+            conn.execute("UPDATE tasks SET text = ? WHERE id = ? AND user_id = ?", (text, tid, user_id))
+    conn.commit()
+    row = conn.execute("SELECT id, text, done FROM tasks WHERE id = ? AND user_id = ?", (tid, user_id)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"id": row["id"], "text": row["text"], "done": bool(row["done"])})
 
 
 @app.route("/api/tasks/<tid>", methods=["DELETE"])
+@login_required
 def api_tasks_delete(tid):
-    tasks = [t for t in _tasks() if str(t.get("id")) != str(tid)]
-    _save_tasks(tasks)
+    user_id = get_user_id()
+    conn = get_db()
+    conn.execute("DELETE FROM tasks WHERE id = ? AND user_id = ?", (tid, user_id))
+    conn.commit()
+    conn.close()
     return jsonify({"ok": True}), 200
 
 
 # — API: notes
 @app.route("/api/notes", methods=["GET"])
+@login_required
 def api_notes_list():
-    return jsonify({"notes": _notes()})
+    user_id = get_user_id()
+    conn = get_db()
+    rows = conn.execute("SELECT id, title, body FROM notes WHERE user_id = ? ORDER BY created_at DESC", (user_id,)).fetchall()
+    conn.close()
+    notes = [{"id": r["id"], "title": r["title"], "body": r["body"] or ""} for r in rows]
+    return jsonify({"notes": notes})
 
 
 @app.route("/api/notes", methods=["POST"])
+@login_required
 def api_notes_create():
+    user_id = get_user_id()
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
     if not title:
         return jsonify({"error": "title required"}), 400
-    notes = _notes()
-    note = {"id": str(uuid.uuid4()), "title": title, "body": (data.get("body") or "").strip()}
-    notes.append(note)
-    _save_notes(notes)
-    return jsonify(note), 201
+    note_id = str(uuid.uuid4())
+    body = (data.get("body") or "").strip()
+    conn = get_db()
+    conn.execute("INSERT INTO notes (id, user_id, title, body) VALUES (?, ?, ?, ?)", (note_id, user_id, title, body))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": note_id, "title": title, "body": body}), 201
 
 
 @app.route("/api/notes/<nid>", methods=["DELETE"])
+@login_required
 def api_notes_delete(nid):
-    notes = [n for n in _notes() if str(n.get("id")) != str(nid)]
-    _save_notes(notes)
+    user_id = get_user_id()
+    conn = get_db()
+    conn.execute("DELETE FROM notes WHERE id = ? AND user_id = ?", (nid, user_id))
+    conn.commit()
+    conn.close()
     return jsonify({"ok": True}), 200
 
 
 # — API: events (calendar)
 @app.route("/api/events", methods=["GET"])
+@login_required
 def api_events_list():
-    return jsonify({"events": _events()})
+    user_id = get_user_id()
+    conn = get_db()
+    rows = conn.execute("SELECT id, date, title FROM events WHERE user_id = ? ORDER BY date", (user_id,)).fetchall()
+    conn.close()
+    events = [{"id": r["id"], "date": r["date"], "title": r["title"]} for r in rows]
+    return jsonify({"events": events})
 
 
 @app.route("/api/events", methods=["POST"])
+@login_required
 def api_events_create():
+    user_id = get_user_id()
     data = request.get_json(silent=True) or {}
     date = (data.get("date") or "").strip()
     title = (data.get("title") or "").strip()
     if not date or not title:
         return jsonify({"error": "date and title required"}), 400
-    events = _events()
-    ev = {"id": str(uuid.uuid4()), "date": date, "title": title}
-    events.append(ev)
-    _save_events(events)
-    return jsonify(ev), 201
+    event_id = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute("INSERT INTO events (id, user_id, date, title) VALUES (?, ?, ?, ?)", (event_id, user_id, date, title))
+    conn.commit()
+    conn.close()
+    return jsonify({"id": event_id, "date": date, "title": title}), 201
 
 
 @app.route("/api/events/<eid>", methods=["DELETE"])
+@login_required
 def api_events_delete(eid):
-    events = [e for e in _events() if str(e.get("id")) != str(eid)]
-    _save_events(events)
+    user_id = get_user_id()
+    conn = get_db()
+    conn.execute("DELETE FROM events WHERE id = ? AND user_id = ?", (eid, user_id))
+    conn.commit()
+    conn.close()
     return jsonify({"ok": True}), 200
 
 
 # — API: AI query (routing/formatting only)
 @app.route("/api/ai/query", methods=["POST"])
+@login_required
 def api_ai_query():
     data = request.get_json(silent=True) or {}
     query = (data.get("query") or "").strip()
